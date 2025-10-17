@@ -1,5 +1,6 @@
 from rapidfuzz import fuzz
 from rapidfuzz.distance import JaroWinkler
+from functools import lru_cache
 import re
 
 def address_similarity(adr_1, adr_2, weight_fsa=0.2, weight_numbers=0.3, weight_Wratio=0.25, weight_JW=0.25, verbose=False):
@@ -43,7 +44,7 @@ def address_similarity(adr_1, adr_2, weight_fsa=0.2, weight_numbers=0.3, weight_
         else:
             return overall_score
  
-
+@lru_cache(maxsize=1000)
 def parse_address(address):
     """
     Parses an address to extract the postal code, FSA, and numbers.
@@ -56,8 +57,10 @@ def parse_address(address):
     parsed_address['address'] = address
     parsed_address['postal_code'] = re.search(r'\b([A-Z]\d[A-Z]\s?\d[A-Z]\d)\b', address).group(0) if re.search(r'\b([A-Z]\d[A-Z]\s?\d[A-Z]\d)\b', address) else None
     parsed_address['fsa'] = parsed_address['postal_code'][:3] if parsed_address['postal_code'] else None
-    parsed_address['numbers'] = set(re.findall(r'\b\d+\b', address))
+    parsed_address['numbers'] = set(re.findall(r'\b\d+[A-Za-z]?\b', address))
 
     return parsed_address
+
+
 
 
