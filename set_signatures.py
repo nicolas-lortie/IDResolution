@@ -16,12 +16,14 @@ class SetSignatures:
                    num_perm : int,
                    seed : int = 42,
                    shingle_size : int = 3,
-                   treshold: float = 0.7
+                   treshold: float = 0.7,
+                   key_size: int = 128
                    ):
         self.num_perm = num_perm
         self.seed = seed
         self.shingle_size = shingle_size
         self.treshold = treshold
+        self.key_size = key_size
         self._a, self._b = self._permutations()
         self.num_bands, self.rows_per_band, self.actual_treshold = self._pick_b_r(self.num_perm, self.treshold)
     
@@ -65,7 +67,7 @@ class SetSignatures:
         minhash_signature = np.minimum.reduce(permuted_hashes, axis=0).astype(np.uint64)  
         return minhash_signature
     
-    def _compute_lsh_key_int(self, minhash_signature: np.ndarray) -> list[int]:
+    def _compute_lsh_key_128(self, minhash_signature: np.ndarray) -> list[int]:
         sig = np.ascontiguousarray(minhash_signature.astype(np.dtype('<u8'), copy=False))
         out = []
         for band in range(self.num_bands):
@@ -75,18 +77,36 @@ class SetSignatures:
             out.append((band << 64) | bucket64)  
         return out
     
+    # 64-bit LSH key computation, higher risk of collision but requires less memory for storage
+    def _compute_lsh_key_64(self, minhash_signature: np.ndarray) -> list[int]:
+        sig = np.ascontiguousarray(minhash_signature.astype(np.dtype('<u8'), copy=False))
+        out = []
+        for band in range(self.num_bands):
+            s = band * self.rows_per_band
+            e = s + self.rows_per_band
+            bucket32, _ = mmh3.hash(sig[s:e].tobytes(), seed=self.seed, signed=False)
+            out.append((band << 32) | bucket32)  
+        return out
+    
     def get_lsh_key(self, text):
         shingles = self.shingles(text)
         minhash_signature = self._compute_minhash(shingles)
-        lsh_keys = self._compute_lsh_key_int(minhash_signature)
+        if self.key_size == 64:
+            lsh_keys = self._compute_lsh_key_64(minhash_signature)
+        else:
+            lsh_keys = self._compute_lsh_key_128(minhash_signature)
         return lsh_keys
     
+    # TODO: Find a way to incorporate the IDs into the batch processing for better tracking
     def get_batch_lsh_key(self, texts: list[str]) -> list[list[int]]:
         all_keys = []
         for text in texts:
             shingles = self.shingles(text)
             minhash_signature = self._compute_minhash(shingles)
-            lsh_keys = self._compute_lsh_key_int(minhash_signature)
+            if self.key_size == 64:
+                lsh_keys = self._compute_lsh_key_64(minhash_signature)
+            else:
+                lsh_keys = self._compute_lsh_key_128(minhash_signature)
             all_keys.append(lsh_keys)
         return all_keys 
 

@@ -1,5 +1,9 @@
 venv/
-
+data/
 __pycache__/
+my_lmdb_db/
+.ipynb_checkpoints/
+
+*.ipynb
 
 test.py
