@@ -1,0 +1,8 @@
+Custom Non-Commercial License
+Copyright (c) 2025 Nicolas Lortie
+
+Permission is granted to use, copy, and modify this software for personal, educational, or research use only.
+
+Commercial or internal use of this software, including but not limited to use in commercial products, services, or work performed for compensation, requires explicit written authorization from the copyright holder. This software is provided "as is", without warranty of any kind.
+
+For the purposes of this license, "internal use" means use of the software within an organization for its own operations or in connection with work performed for compensation.
