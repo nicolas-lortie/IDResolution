@@ -10,7 +10,7 @@ _MAX_HASH = np.uint64((1 << 32) - 1)
 
 
 
-class SetSignatures:
+class StringSignatures:
      
     def __init__(self,
                    num_perm : int,
@@ -67,34 +67,21 @@ class SetSignatures:
         minhash_signature = np.minimum.reduce(permuted_hashes, axis=0).astype(np.uint64)  
         return minhash_signature
     
-    def _compute_lsh_key_128(self, minhash_signature: np.ndarray) -> list[int]:
+
+    def _compute_lsh_key_64(self, minhash_signature: np.ndarray) -> np.ndarray:
         sig = np.ascontiguousarray(minhash_signature.astype(np.dtype('<u8'), copy=False))
-        out = []
+        out = np.empty(self.num_bands, dtype=np.uint64)
         for band in range(self.num_bands):
             s = band * self.rows_per_band
             e = s + self.rows_per_band
-            bucket64, _ = mmh3.hash64(sig[s:e].tobytes(), seed=self.seed, signed=False)
-            out.append((band << 64) | bucket64)  
+            key64 = mmh3.hash64(sig[s:e].tobytes(), seed=(self.seed ^ band), signed=False) 
+            out[band] = np.uint64(key64[0])
         return out
-    
-    # 64-bit LSH key computation, higher risk of collision but requires less memory for storage
-    def _compute_lsh_key_64(self, minhash_signature: np.ndarray) -> list[int]:
-        sig = np.ascontiguousarray(minhash_signature.astype(np.dtype('<u8'), copy=False))
-        out = []
-        for band in range(self.num_bands):
-            s = band * self.rows_per_band
-            e = s + self.rows_per_band
-            bucket32, _ = mmh3.hash(sig[s:e].tobytes(), seed=self.seed, signed=False)
-            out.append((band << 32) | bucket32)  
-        return out
-    
+  
     def get_lsh_key(self, text):
         shingles = self.shingles(text)
         minhash_signature = self._compute_minhash(shingles)
-        if self.key_size == 64:
-            lsh_keys = self._compute_lsh_key_64(minhash_signature)
-        else:
-            lsh_keys = self._compute_lsh_key_128(minhash_signature)
+        lsh_keys = self._compute_lsh_key_64(minhash_signature)
         return lsh_keys
     
     # TODO: Find a way to incorporate the IDs into the batch processing for better tracking
@@ -103,10 +90,7 @@ class SetSignatures:
         for text in texts:
             shingles = self.shingles(text)
             minhash_signature = self._compute_minhash(shingles)
-            if self.key_size == 64:
-                lsh_keys = self._compute_lsh_key_64(minhash_signature)
-            else:
-                lsh_keys = self._compute_lsh_key_128(minhash_signature)
+            lsh_keys = self._compute_lsh_key_64(minhash_signature)
             all_keys.append(lsh_keys)
         return all_keys 
 
